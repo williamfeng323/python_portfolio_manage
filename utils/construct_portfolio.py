@@ -1,75 +1,45 @@
 import numpy
 import pandas
-import cvxopt
-from cvxopt import solvers
+# import cvxopt
+# from cvxopt import solvers
+import scipy.optimize as s_optimize
+from scipy.stats import norm
 import warnings
 
 
-def markowitz_portfolio(cov_mat,exp_returns, target_return,
-                        allow_short=False, market_neutral=False):
-    if market_neutral and not allow_short:
-        warnings.warn("A market neutral portfolio implies shorting")
-        allow_short = True
-
-    n = len(cov_mat)
-    P = cvxopt.matrix(cov_mat.values)
-    q = cvxopt.matrix(0.0, (n, 1))
-    # Constraints Gx <= h
-    if not allow_short:
-        # exp_returns*x >= target_return and x >= 0
-        G = cvxopt.matrix(numpy.vstack((-exp_returns.values, -numpy.identity(n))))
-        h = cvxopt.matrix(numpy.vstack((-target_return, +numpy.zeros((n, 1)))))
+def calculate_var(weights, cov_mat, value=1e6, confident_interval=.99):
+    if cov_mat.empty:
+        raise ValueError('covariance matrix was not defined')
     else:
-        # exp_returns*x >= target_return
-        G = cvxopt.matrix(-exp_returns.values).T
-        h = cvxopt.matrix(-target_return)
+        if not isinstance(cov_mat, pandas.DataFrame):
+            raise ValueError("Covariance matrix is not a DataFrame")
+    if value not in locals():
+        warnings.warn('portfolio initial value is not specified, 1e6 will be used as initial value')
+    if confident_interval not in locals():
+        warnings.warn('confident_interval initial value is not specified, .99 will be used as confident_interval')
 
-    # Constraints Ax = b
-    # sum(x) = 1
-    A = cvxopt.matrix(1.0, (1, n))
-
-    if not market_neutral:
-        b = cvxopt.matrix(1.0)
-    else:
-        b = cvxopt.matrix(0.0)
-    # Solve
-    solvers.options['show_progress'] = False
-    sol = solvers.qp(P, q, G, h, A, b)
-
-    if sol['status'] != 'optimal':
-        warnings.warn("Convergence problem")
-
-    # Put weights into a labeled series
-    weights = pandas.Series(sol['x'], index=cov_mat.index)
-    return weights
+    return norm.ppf(confident_interval) * numpy.sqrt(numpy.square(value)) * (numpy.dot(weights.T, numpy.dot(cov_mat, weights)))
 
 
-def tangency_portfolio(cov_mat, exp_returns, allow_short=False):
-    n = len(cov_mat)
+def minimize_var(returns, cov_mat, confident_interval=.99, value=1e6):
+    def var(weights):
+        return norm.ppf(confident_interval) * numpy.sqrt(numpy.square(value)) * \
+               (numpy.dot(weights.T, numpy.dot(cov_mat, weights)))
 
-    P = cvxopt.matrix(cov_mat.values)
-    q = cvxopt.matrix(0.0, (n, 1))
+    numberOfStocks = returns.columns.size
+    bounds = [(0., 1.) for i in numpy.arange(numberOfStocks)]
+    weights = numpy.ones(returns.columns.size) / returns.columns.size
+    constraint = ({
+        'type': 'eq',
+        'fun': lambda weights: numpy.sum(weights)-1
+    })
+    results = s_optimize.minimize(var, weights, method='SLSQP', constraints=constraint, bounds=bounds)
+    return ['%.8f' % elem for elem in numpy.round(results.x, 4)]
 
-    # Constraints Gx <= h
-    if not allow_short:
-        # exp_returns*x >= 1 and x >= 0
-        G = cvxopt.matrix(numpy.vstack((-exp_returns.values, -numpy.identity(n))))
-        h = cvxopt.matrix(numpy.vstack((-1.0, numpy.zeros((n, 1)))))
-    else:
-        # exp_returns*x >= 1
-        G = cvxopt.matrix(-exp_returns.values).T
-        h = cvxopt.matrix(-1.0)
-
-    # Solve
-    solvers.options['show_progress'] = False
-    sol = solvers.qp(P, q, G, h)
-
-    if sol['status'] != 'optimal':
-        warnings.warn("Convergence problem")
-
-    # Put weights into a labeled series
-    weights = pandas.Series(sol['x'], index=cov_mat.index)
-
-    # Rescale weights, so that sum(weights) = 1
-    weights /= weights.sum()
-    return weights
+#
+# def set_variables(init_returns, init_cov_mat, init_value, init_confident_interval):
+#     returns = init_returns
+#     cov_Mat = init_cov_mat
+#     value = init_value
+#     confident_interval = init_confident_interval
+#     return True
