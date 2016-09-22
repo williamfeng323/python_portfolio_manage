@@ -1,40 +1,20 @@
-# import sys
-# import operator
-# import portfolioopt as port
-# import pandas
-
-# def sortKey(list):
-#     return list[0]
-#
-# def sortTrail(list):
-#     if 'alice' in list:
-#         print 'Hello Alice'
-#     print sorted(list, key=sortKey)
-#
-# def main():
-#     name = 'world'
-#     if len(sys.argv) > 1:
-#         name_list = sys.argv[1:]
-#         name = ''
-#         for val in name_list:
-#             name += '%s ' % val
-#     print 'hello %s' % name
-#     sortTrail(name_list)
-#     dic = {'a':3,'b':2,'c':1}
-#     # print dic
-#     print sorted(dic.items(),key=operator.itemgetter(1))
 import os
-import pandas as pd
+import pandas
 import sys
-import cvxopt as opt
-import numpy as np
+import numpy
+from scipy.stats import norm
+import matplotlib.pyplot as plt
+
+import utils.construct_portfolio as cp
+
 
 def loadData(file_name):
     file_path = os.path.join('./data',file_name)
-    returns = pd.read_csv(file_path, index_col=0)
+    returns = pandas.read_csv(file_path, index_col=0)
     cov_mat = returns.cov()
     avg_returns = returns.mean()
     return returns, cov_mat, avg_returns
+
 
 def main():
     if len(sys.argv) > 1:
@@ -42,6 +22,17 @@ def main():
     else:
         file_name = 'stockReturns.csv'
         returns, cov_mat, avg_returns = loadData(file_name)
+
+    value = 1e6  # Investing one million in the portfolio
+    confident_interval = 0.99
+    # variance = numpy.diag(cov_mat)
+    # individual_sigma = numpy.sqrt(variance)
+
+    resolve = pandas.to_numeric(pandas.Series(cp.minimize_var(returns, confident_interval, value)))
+    pf_mean, pf_risk, pf_var = cp.describe_portfolio(resolve, returns, value, confident_interval)
+
+    x = numpy.linspace(norm.ppf(.001, pf_mean, pf_risk), norm.ppf(.999, pf_mean, pf_risk), 1000)
+    plt.plot(x, norm.pdf(x, pf_mean, pf_risk))
 
 if __name__ == '__main__':
     main()

@@ -1,75 +1,48 @@
 import numpy
 import pandas
-import cvxopt
-from cvxopt import solvers
-import warnings
+import scipy.optimize as s_optimize
+from scipy.stats import norm
 
 
-def markowitz_portfolio(cov_mat,exp_returns, target_return,
-                        allow_short=False, market_neutral=False):
-    if market_neutral and not allow_short:
-        warnings.warn("A market neutral portfolio implies shorting")
-        allow_short = True
+def describe_portfolio(weights, returns, value, confident_interval):
+    pf_mean = numpy.dot(weights.T, returns.mean())
+    pf_risk = numpy.sqrt(numpy.dot(weights.T, numpy.dot(returns.cov(), weights)))
+    pf_var = calculate_var(weights, returns, value, confident_interval)
+    return pf_mean, pf_risk, pf_var
 
-    n = len(cov_mat)
-    P = cvxopt.matrix(cov_mat.values)
-    q = cvxopt.matrix(0.0, (n, 1))
-    # Constraints Gx <= h
-    if not allow_short:
-        # exp_returns*x >= target_return and x >= 0
-        G = cvxopt.matrix(numpy.vstack((-exp_returns.values, -numpy.identity(n))))
-        h = cvxopt.matrix(numpy.vstack((-target_return, +numpy.zeros((n, 1)))))
+
+def calculate_var(weights, returns, value=1e6, confident_interval=.99):
+    if returns.empty:
+        raise ValueError('covariance matrix was not defined')
     else:
-        # exp_returns*x >= target_return
-        G = cvxopt.matrix(-exp_returns.values).T
-        h = cvxopt.matrix(-target_return)
-
-    # Constraints Ax = b
-    # sum(x) = 1
-    A = cvxopt.matrix(1.0, (1, n))
-
-    if not market_neutral:
-        b = cvxopt.matrix(1.0)
-    else:
-        b = cvxopt.matrix(0.0)
-    # Solve
-    solvers.options['show_progress'] = False
-    sol = solvers.qp(P, q, G, h, A, b)
-
-    if sol['status'] != 'optimal':
-        warnings.warn("Convergence problem")
-
-    # Put weights into a labeled series
-    weights = pandas.Series(sol['x'], index=cov_mat.index)
-    return weights
+        if not isinstance(returns, pandas.DataFrame):
+            raise ValueError("Covariance matrix is not a DataFrame")
+    cov_mat = returns.cov()
+    portfolio_mean = numpy.dot(weights.T, returns.mean())
+    sigma = numpy.sqrt(numpy.dot(weights.T, numpy.dot(cov_mat, weights)))
+    # (mean + confident_interval * sigma) * portfolio_size
+    return norm.interval(confident_interval, loc=portfolio_mean, scale=sigma/numpy.sqrt(len(returns.index)))[0] * \
+        numpy.sqrt(numpy.square(value))
 
 
-def tangency_portfolio(cov_mat, exp_returns, allow_short=False):
-    n = len(cov_mat)
+def minimize_var(returns, confident_interval=.01, value=1e6):
 
-    P = cvxopt.matrix(cov_mat.values)
-    q = cvxopt.matrix(0.0, (n, 1))
+    cov_mat = returns.cov()
 
-    # Constraints Gx <= h
-    if not allow_short:
-        # exp_returns*x >= 1 and x >= 0
-        G = cvxopt.matrix(numpy.vstack((-exp_returns.values, -numpy.identity(n))))
-        h = cvxopt.matrix(numpy.vstack((-1.0, numpy.zeros((n, 1)))))
-    else:
-        # exp_returns*x >= 1
-        G = cvxopt.matrix(-exp_returns.values).T
-        h = cvxopt.matrix(-1.0)
+    def var(weights):
+        portfolio_mean = numpy.dot(weights.T, returns.mean())
+        sigma = numpy.sqrt(numpy.dot(weights.T, numpy.dot(cov_mat, weights)))
+        # (mean + confident_interval * sigma) * portfolio_size
+        return numpy.absolute(norm.interval(confident_interval, loc=portfolio_mean, scale=sigma / numpy.sqrt(len(returns.index)))[0] *
+                              numpy.sqrt(numpy.square(value)))
 
-    # Solve
-    solvers.options['show_progress'] = False
-    sol = solvers.qp(P, q, G, h)
+    numberOfStocks = returns.columns.size
+    bounds = [(0., 1.) for i in numpy.arange(numberOfStocks)]
+    weights = numpy.ones(returns.columns.size) / returns.columns.size
+    constraint = ({
+        'type': 'eq',
+        'fun': lambda weights: numpy.sum(weights)-1
+    })
+    results = s_optimize.minimize(var, weights, method='SLSQP', constraints=constraint, bounds=bounds)
+    return ['%.8f' % elem for elem in numpy.round(results.x, 4)]
 
-    if sol['status'] != 'optimal':
-        warnings.warn("Convergence problem")
-
-    # Put weights into a labeled series
-    weights = pandas.Series(sol['x'], index=cov_mat.index)
-
-    # Rescale weights, so that sum(weights) = 1
-    weights /= weights.sum()
-    return weights
