@@ -2,6 +2,8 @@ import os
 import pandas
 import sys
 import numpy
+from scipy.stats import norm
+import matplotlib.pyplot as plt
 
 import utils.construct_portfolio as cp
 
@@ -22,11 +24,15 @@ def main():
         returns, cov_mat, avg_returns = loadData(file_name)
 
     value = 1e6  # Investing one million in the portfolio
-    confident_interval = 0.01
-    variance = numpy.diag(cov_mat)
-    standard_deviation = numpy.sqrt(variance)
+    confident_interval = 0.99
+    # variance = numpy.diag(cov_mat)
+    # individual_sigma = numpy.sqrt(variance)
 
     resolve = pandas.to_numeric(pandas.Series(cp.minimize_var(returns, confident_interval, value)))
+    pf_mean, pf_risk, pf_var = cp.describe_portfolio(resolve, returns, value, confident_interval)
+
+    x = numpy.linspace(norm.ppf(.001, pf_mean, pf_risk), norm.ppf(.999, pf_mean, pf_risk), 1000)
+    plt.plot(x, norm.pdf(x, pf_mean, pf_risk))
 
 if __name__ == '__main__':
     main()
