@@ -22,11 +22,11 @@ def main():
         returns, cov_mat, avg_returns = loadData(file_name)
 
     value = 1e6  # Investing one million in the portfolio
-    confident_interval = 0.99
+    confident_interval = 0.01
     variance = numpy.diag(cov_mat)
     standard_deviation = numpy.sqrt(variance)
 
-    resolve = pandas.to_numeric(pandas.Series(cp.minimize_var(returns, cov_mat, confident_interval, value)))
+    resolve = pandas.to_numeric(pandas.Series(cp.minimize_var(returns, confident_interval, value)))
 
 if __name__ == '__main__':
     main()
