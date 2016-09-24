@@ -45,7 +45,7 @@ def minimize_var(returns, confident_interval=.01, value=1e6):
         'type': 'eq',
         'fun': lambda weights: numpy.sum(weights)-1
     })
-    results = s_optimize.minimize(var, weights, method='SLSQP', constraints=constraint, bounds=bounds)
+    results = s_optimize.minimize(var, weights, method='SLSQP', constraints=constraint, bounds=bounds, options={'disp':True})
     return ['%.8f' % elem for elem in numpy.round(results.x, 4)]
 
 
@@ -84,5 +84,28 @@ def maximize_omega(returns, target):
         'type': 'eq',
         'fun': lambda weights: numpy.sum(weights) - 1
     })
-    results = s_optimize.minimize(omega, weights, method='SLSQP', constraints=constraint, bounds=bounds)
+    results = s_optimize.minimize(omega, weights, method='SLSQP', constraints=constraint, bounds=bounds, options={'disp':True})
+    return ['%.8f' % elem for elem in numpy.round(results.x, 4)]
+
+
+def maximize_omega2(returns, target):
+    # the omega raitio function in this maximize function is quite different from the method introduce
+    # in the course.
+    # I am not sure which will be better since the result is different
+    #
+    def omega2(weights):
+        pf_returns = numpy.dot(returns, weights)
+        upside = sum([ret-target for ret in pf_returns if ret > target])
+        downside = sum([target-ret for ret in pf_returns if ret < target])
+
+        return -1.0 * (upside / downside)
+
+    numberOfStocks = returns.columns.size
+    bounds = [(0., 1.) for i in numpy.arange(numberOfStocks)]
+    weights = numpy.ones(returns.columns.size) / returns.columns.size
+    constraint = ({
+        'type': 'eq',
+        'fun': lambda weights: numpy.sum(weights) - 1
+    })
+    results = s_optimize.minimize(omega2, weights, method='SLSQP', constraints=constraint, bounds=bounds, options={'disp':True})
     return ['%.8f' % elem for elem in numpy.round(results.x, 4)]
