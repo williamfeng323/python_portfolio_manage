@@ -27,7 +27,7 @@ def calculate_var(weights, returns, value=1e6, confident_interval=.99):
         numpy.sqrt(numpy.square(value))
 
 
-def minimize_var(returns, confident_interval=.01, value=1e6):
+def minimize_var(returns, confident_interval=.99, value=1e6):
 
     cov_mat = returns.cov()
 
@@ -60,7 +60,7 @@ def calculate_omega(returns, weights, target):
     def modified_kcdf(r):
         return 1.0-quad(kernel.evaluate, -numpy.inf, r)[0]
 
-    return quad(modified_kcdf, target, numpy.inf)[0]/quad(kernel_cdf, -numpy.inf, target)[0]
+    return quad(modified_kcdf, target, 1.0)[0]/quad(kernel_cdf, -numpy.inf, target)[0]
 
 
 def maximize_omega(returns, target):
@@ -75,7 +75,7 @@ def maximize_omega(returns, target):
         def modified_kcdf(r):
             return 1.0-quad(kernel.evaluate, -numpy.inf, r)[0]
 
-        return -1.0*(quad(modified_kcdf, target, .42)[0]/quad(kernel_cdf, -numpy.inf, target)[0])
+        return -1.0*(quad(modified_kcdf, target, 1.0)[0]/quad(kernel_cdf, -numpy.inf, target)[0])
 
     numberOfStocks = returns.columns.size
     bounds = [(0., 1.) for i in numpy.arange(numberOfStocks)]
