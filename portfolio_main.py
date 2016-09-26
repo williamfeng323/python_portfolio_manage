@@ -29,8 +29,9 @@ def main():
     # individual_sigma = numpy.sqrt(variance)
 
     resolve = pandas.to_numeric(pandas.Series(cp.minimize_var(returns, confident_interval, value)))
-    pf_mean, pf_risk, pf_var = cp.describe_portfolio(resolve, returns, value, confident_interval)
+    resolve2 = pandas.to_numeric(pandas.Series(cp.maximize_omega2(returns, .02)))
 
+    pf_mean, pf_risk, pf_var = cp.describe_portfolio(resolve, returns, value, confident_interval)
     x = numpy.linspace(norm.ppf(.001, pf_mean, pf_risk), norm.ppf(.999, pf_mean, pf_risk), 1000)
     plt.plot(x, norm.pdf(x, pf_mean, pf_risk))
 

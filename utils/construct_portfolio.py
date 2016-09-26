@@ -49,21 +49,16 @@ def minimize_var(returns, confident_interval=.99, value=1e6):
     return ['%.8f' % elem for elem in numpy.round(results.x, 4)]
 
 
-def calculate_omega(returns, weights, target):
+def calculate_omega(targets, returns, weights):
     pf_returns = numpy.dot(returns, weights)
-    kernel = gaussian_kde(pf_returns)
-
-    # def kernel_cdf(r):
-    #     p = quad(kernel.evaluate, -numpy.inf, r)
-    #     return p[0]
-    #
-    # def modified_kcdf(r):
-    #     return 1.0-quad(kernel.evaluate, -numpy.inf, r)[0]
-    #
-    # return quad(modified_kcdf, target, 1.0)[0]/quad(kernel_cdf, -numpy.inf, target)[0]
-    upside = sum([ret - target for ret in pf_returns if ret > target])
-    downside = sum([target - ret for ret in pf_returns if ret < target])
-    return upside / downside
+    omega_ratios = []
+    if len(targets)==1:
+        targets = [targets]
+    for target in targets:
+        upside = sum([ret - target for ret in pf_returns if ret > target])
+        downside = sum([target - ret for ret in pf_returns if ret < target])
+        omega_ratios.append(upside / downside)
+    return omega_ratios
 
 
 def maximize_omega(returns, target):
