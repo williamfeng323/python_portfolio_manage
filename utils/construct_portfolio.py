@@ -53,14 +53,17 @@ def calculate_omega(returns, weights, target):
     pf_returns = numpy.dot(returns, weights)
     kernel = gaussian_kde(pf_returns)
 
-    def kernel_cdf(r):
-        p = quad(kernel.evaluate, -numpy.inf, r)
-        return p[0]
-
-    def modified_kcdf(r):
-        return 1.0-quad(kernel.evaluate, -numpy.inf, r)[0]
-
-    return quad(modified_kcdf, target, 1.0)[0]/quad(kernel_cdf, -numpy.inf, target)[0]
+    # def kernel_cdf(r):
+    #     p = quad(kernel.evaluate, -numpy.inf, r)
+    #     return p[0]
+    #
+    # def modified_kcdf(r):
+    #     return 1.0-quad(kernel.evaluate, -numpy.inf, r)[0]
+    #
+    # return quad(modified_kcdf, target, 1.0)[0]/quad(kernel_cdf, -numpy.inf, target)[0]
+    upside = sum([ret - target for ret in pf_returns if ret > target])
+    downside = sum([target - ret for ret in pf_returns if ret < target])
+    return upside / downside
 
 
 def maximize_omega(returns, target):
